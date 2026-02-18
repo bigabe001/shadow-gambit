@@ -1,0 +1,7 @@
+[package]
+name = "move_validator"
+type = "bin"
+authors = [""]
+compiler_version = ">=0.33.0"
+
+[dependencies]
