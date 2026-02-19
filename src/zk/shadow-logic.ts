@@ -1,28 +1,30 @@
-// 1. FORCE THE POLYFILL AT THE WINDOW LEVEL IMMEDIATELY
 import { Buffer } from "buffer/";
-if (typeof window !== 'undefined') {
-    window.Buffer = Buffer;
-    (window as any).global = window;
-}
 
 export async function generateMoveProof(oldX: number, oldY: number, newX: number, newY: number) {
-    // 2. DYNAMIC IMPORTS AFTER POLYFILL
+    if (typeof window !== 'undefined') {
+        (window as any).global = window;
+        (window as any).Buffer = Buffer;
+    }
+
     const { Noir } = await import("@noir-lang/noir_js");
     const { UltraHonkBackend } = await import("@noir-lang/backend_barretenberg");
 
     try {
         const response = await fetch('/circuits/target/circuits.json');
         const circuitData = await response.json();
-        
-        // Use the raw bytecode string directly. 
-        // We will let the library try one more time with a 'fixed' global environment.
         const rawBytecode = circuitData.bytecode || circuitData.circuit;
 
-        console.log("SHADOW-LOG: Initializing Backend...");
-        
-        // This is the line that was crashing. 
-        // By passing the STRING directly, we avoid the manual decode that was failing.
-        const backend = new UltraHonkBackend(rawBytecode); 
+        // --- THE BYPASS ---
+        // We decode it here so the backend doesn't have to.
+        const binaryString = window.atob(rawBytecode);
+        const acirBuffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            acirBuffer[i] = binaryString.charCodeAt(i);
+        }
+
+        console.log("SHADOW-LOG: Initializing Backend with pre-decoded bytes...");
+        // Passing the Uint8Array directly avoids the internal base64Decode call
+        const backend = new UltraHonkBackend(acirBuffer); 
         
         const noir = new Noir({ 
             bytecode: rawBytecode, 
@@ -48,7 +50,7 @@ export async function generateMoveProof(oldX: number, oldY: number, newX: number
         };
 
     } catch (err: any) {
-        console.error("FULL ERROR OBJECT:", err);
+        console.error("FULL ERROR:", err);
         throw new Error(`[Noir Engine Panic]: ${err.message}`);
     }
 }
