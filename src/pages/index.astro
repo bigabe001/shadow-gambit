@@ -1,0 +1,150 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Shadow Gambit">
+  <main class="min-h-screen bg-[#050505] text-slate-300 flex items-center justify-center p-4 font-mono">
+    
+    <div class="w-full max-w-lg relative group">
+      <div id="glow" class="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+      
+      <div class="relative bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+        
+        <div class="p-6 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="text-2xl font-black text-white tracking-tighter italic">SHADOW GAMBIT</h1>
+              <div class="h-1 w-12 bg-cyan-500 mt-1"></div>
+            </div>
+            <div class="text-right">
+              <div id="status-dot" class="inline-block h-2 w-2 bg-red-500 rounded-full animate-pulse mr-2 transition-colors duration-500"></div>
+              <span id="status-text" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest transition-colors duration-500">Link Offline</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-6 space-y-6">
+          <div class="grid grid-cols-2 gap-px bg-white/10 border border-white/10 rounded-lg overflow-hidden">
+            <div class="bg-[#0f0f0f] p-4">
+              <span class="text-[9px] text-cyan-500 uppercase font-bold">Coord Alpha</span>
+              <p id="coord-display" class="text-xl text-white font-black">0.0 / 0.0</p>
+            </div>
+            <div class="bg-[#0f0f0f] p-4">
+              <span class="text-[9px] text-blue-500 uppercase font-bold">Signal Status</span>
+              <p id="signal-status" class="text-xl text-white font-black italic">CLOAKED</p>
+            </div>
+          </div>
+
+          <div class="relative">
+            <div class="absolute top-0 right-0 p-2 text-[9px] text-white/20 uppercase">Encrypted Stream</div>
+            <div id="log-container" class="bg-black/50 rounded border border-white/5 p-4 h-40 overflow-y-auto text-[11px] leading-relaxed custom-scrollbar">
+              <div id="status-log" class="space-y-1">
+                <div class="text-slate-600">>> System ready for deployment...</div>
+              </div>
+            </div>
+          </div>
+
+          <button id="move-btn" class="w-full group relative bg-white text-black font-black py-4 rounded-lg transition-all active:scale-95 disabled:opacity-30 overflow-hidden">
+            <div class="absolute inset-0 bg-cyan-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+            <span class="relative z-10 uppercase tracking-[0.3em] text-[11px] group-hover:text-white">Execute Stealth Move</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style is:global>
+  .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; }
+</style>
+
+<script>
+  // 1. FORCED POLYFILLS
+  import { Buffer } from "buffer/";
+  (window as any).Buffer = Buffer;
+  (window as any).global = window;
+
+  import { isAllowed, setAllowed, getUserInfo } from "@stellar/freighter-api";
+  import { generateMoveProof } from "../zk/shadow-logic";
+  import { submitStealthMove } from "../zk/stellar-bridge";
+
+  const btn = document.getElementById('move-btn') as HTMLButtonElement;
+  const log = document.getElementById('status-log')!;
+  const statusDot = document.getElementById('status-dot')!;
+  const statusTxt = document.getElementById('status-text')!;
+  const coordDisplay = document.getElementById('coord-display')!;
+
+  const addLog = (msg: string, type: 'info' | 'error' | 'success' = 'info') => {
+    console.log(`[SHADOW-LOG]: ${msg}`);
+    const div = document.createElement('div');
+    const colors = { 
+      info: 'text-cyan-500/70', 
+      error: 'text-red-500 font-bold', 
+      success: 'text-green-400 font-bold' 
+    };
+    div.className = `${colors[type]} animate-in fade-in duration-300`;
+    div.innerHTML = `> ${msg}`;
+    log.appendChild(div);
+    log.parentElement!.scrollTop = log.parentElement!.scrollHeight;
+  };
+
+  // Improved Handshake with Fallback
+  async function fetchIdentity() {
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Wallet Timeout")), 2500)
+    );
+
+    const getWalletKey = async () => {
+      if (!(await isAllowed())) {
+        addLog("Awaiting Freighter permission...", "info");
+        await setAllowed();
+      }
+      const info = await getUserInfo();
+      return info.publicKey;
+    };
+
+    try {
+      // Race the wallet against the timer
+      return await Promise.race([getWalletKey(), timeout]) as string;
+    } catch (e) {
+      addLog("Handshake bypassed. Using Dev Identity.", "info");
+      return "GBOA_DEV_IDENTITY_OVERRIDE"; // Fallback for local testing
+    }
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    addLog("Initializing Neural Link...");
+
+    try {
+      const publicKey = await fetchIdentity();
+      
+      // Update HUD to Online
+      statusDot.className = "inline-block h-2 w-2 bg-green-500 rounded-full mr-2 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+      statusTxt.innerText = "Link Active";
+      statusTxt.className = "text-[10px] font-bold text-green-500 uppercase tracking-widest";
+      
+      addLog(`Identity Verified: ${publicKey.slice(0,8)}...`, "success");
+
+      addLog("Fetching Circuit & Generating ZK-Proof...", "info");
+      // Simulate move from (0,0) to (0,1)
+      const result = await generateMoveProof(0, 0, 0, 1);
+      
+      addLog("ZK-PROOF GENERATED (UltraHonk)", "success");
+      addLog("Broadcasting to Shadow Referee CDW5...", "info");
+
+      await submitStealthMove(result.proof, result.publicInputs);
+      
+      addLog("TRANSACTION FINALIZED ON TESTNET", "success");
+      coordDisplay.innerText = "0.0 / 1.0";
+
+    } catch (err: any) {
+      addLog(`CRITICAL ERROR: ${err.message}`, "error");
+      statusDot.className = "inline-block h-2 w-2 bg-red-500 rounded-full animate-pulse mr-2";
+      statusTxt.innerText = "Link Offline";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>

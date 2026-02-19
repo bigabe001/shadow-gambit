@@ -1,0 +1,31 @@
+{
+  "name": "shadow-gambit",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "build:circuits": "cd circuits && nargo compile && cd .. && mkdir -p public/circuits/target && cp circuits/target/circuits.json public/circuits/target/circuits.json",
+    "prep": "mkdir -p public/circuits/target && cp circuits/target/circuits.json public/circuits/target/circuits.json"
+  },
+  "dependencies": {
+    "@astrojs/tailwind": "^5.1.5",
+    "@aztec/bb.js": "^2.1.11",
+    "@noir-lang/backend_barretenberg": "^0.36.0",
+    "@noir-lang/noir_js": "^1.0.0-beta.19",
+    "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^14.5.0",
+    "@tailwindcss/postcss": "^4.2.0",
+    "astro": "^5.0.0",
+    "buffer": "6.0.3",
+    "tailwindcss": "^3.4.19",
+    "vite-plugin-node-polyfills": "^0.25.0",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "devDependencies": {
+    "vite-plugin-static-copy": "^3.2.0"
+  }
+}
